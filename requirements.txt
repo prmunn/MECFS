@@ -1,0 +1,8 @@
+numpy==1.19.3
+pandas
+pymongo
+mongoengine
+tqdm
+colorama
+python-dateutil
+xlrd
