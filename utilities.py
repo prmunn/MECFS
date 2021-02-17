@@ -6,10 +6,12 @@
 # Created: 10/19/2020
 
 
+import numpy as np
 import pandas as pd
 import dash_table
 import dash_core_components as dcc
 # import dash_bootstrap_components as dbc
+import plotly.express as px
 
 
 # Get attributes for class that do not start with '_'
@@ -18,51 +20,87 @@ def attributes(cls):
     return [i for i in cls.__dict__.keys() if not i.startswith('_') and i not in excludeFields]
 
 
-def create_df_from_object_list(object_list, cls, subDocument):
-    columnsFromClinicalData = ['study_id', 'phenotype', 'site', 'sex', 'age']
+def create_df_from_object_list(object_list, cls, subDocument, assayResultsFlag=False):
+    columnsFromClinicalData = ['study_id', 'phenotype', 'site', 'sex', 'age',
+                               'height_in', 'weight_lbs', 'bmi', 'ethnicity',
+                               'race', 'mecfs_sudden_gradual', 'mecfs_duration',
+                               'qmep_sudevent', 'qmep_metimediagnosis', 'vo2peak1', 'vo2peak2',
+                               'vo2change', 'at1', 'at2', 'atchange']
     attribute_names = attributes(cls)
-    # Remove non-JSON serializable objects (of type User, Biospecimen)
-    attribute_names.remove('created_by')
-    attribute_names.remove('last_modified_by')
-    attribute_names.remove('created_date')
-    attribute_names.remove('last_modified_date')
-    attribute_names.remove('biospecimen_data_reference')
-    print(len(attribute_names))
+    # Remove non-JSON serializable objects (of type User, Biospecimen, etc.)
+    itemsToRemove = ['created_by', 'last_modified_by', 'created_date', 'last_modified_date',
+                     'biospecimen_data_reference', 'biospecimen_data_references', 'assay_results']
+    for item in itemsToRemove:
+        if item in attribute_names:
+            attribute_names.remove(item)
+    print('Length of attribute list:', len(attribute_names))
+    print('Attributes:', attribute_names)
+
+    # Build list of data labels up front - this means looping thru
+    # the object list twice, but I don't see a better way to do it
+    dataLabelsList = []
+    for c in object_list:
+        for sd in c[subDocument]:
+            if assayResultsFlag:
+                for assayResult in sd.assay_results:
+                    if assayResult['data_label'] not in dataLabelsList:
+                        dataLabelsList.append(assayResult['data_label'])
+    # print('dataLabelsList:', dataLabelsList)
 
     data = []
     for c in object_list:
-        print('Study ID: {} - {}'.format(
-            c['study_id'],
-            'ME/CFS patient' if c['phenotype'] == 'ME/CFS' else 'Healthy control'))
+        # print('Study ID: {} - {}'.format(
+        #     c['study_id'],
+        #     'ME/CFS patient' if c['phenotype'] == 'ME/CFS' else 'Healthy control'))
         for sd in c[subDocument]:
             dataRow = []
-            for dataColumn in attribute_names:
-                dataRow.append(sd[dataColumn])
-            # print(
-            #     '      Sample: {}, Freezer ID: {}, {} {} {} {}'.format(
-            #         sd['sample_name'],
-            #         sd.biospecimen_data_reference.freezer_id,
-            #         sd.number_of_reads,
-            #         sd.estimated_number_of_cells,
-            #         sd.mean_reads_per_cell,
-            #         sd.median_genes_per_cell
-            #     ))
-
             # Add clinical data
             for dataColumn in columnsFromClinicalData:
                 dataRow.append(c[dataColumn])
+
+            for dataColumn in attribute_names:
+                dataRow.append(sd[dataColumn])
+
+            if assayResultsFlag:
+                # So that we keep all data labels in the correct order and position (for assays with different
+                # symbols), first build a list of 'None' and then insert the result in the appropriate position
+                resultList = np.repeat(None, len(dataLabelsList)).tolist()
+                for assayResult in sd.assay_results:
+                    dataLabel = assayResult['data_label']
+                    result = assayResult['result']
+                    # Get position in dataLabelsList
+                    dataLabelIndex = dataLabelsList.index(dataLabel)
+                    # Insert result into that position in resultList
+                    resultList[dataLabelIndex] = result
+                for val in resultList:
+                    dataRow.append(val)
+
             # print('len dataRow:', len(dataRow))
             # print('dataRow:', dataRow)
             data.append(dataRow)
+    # print('data:', data)
 
-    # Add clinical data column names
+    # Build list of column names
+    colNamesList = []
     for dataColumn in columnsFromClinicalData:
-        attribute_names.append(dataColumn)
+        colNamesList.append(dataColumn)
+    for dataColumn in attribute_names:
+        colNamesList.append(dataColumn)
+    for dataColumn in dataLabelsList:
+        colNamesList.append(dataColumn)
 
     # print('data:', data)
-    df = pd.DataFrame(data, columns=attribute_names)
+    df = pd.DataFrame(data, columns=colNamesList)
 
-    return df
+    return df, dataLabelsList
+
+
+def set_color_sequence(group_selection=None):
+    colorSequence = px.colors.qualitative.Pastel
+    if group_selection == 'phenotype':
+        colorSequence = ['red', 'blue']
+
+    return colorSequence
 
 
 def spinner_wrapper(component):

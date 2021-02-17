@@ -5,13 +5,10 @@ from data.users import User
 from data.assay_results import AssayResults
 
 
-# time_choices = ('t1', 't2', 't3')
-# cpet_day_choice = ('D1', 'D2')
-# pre_post_cpet_choice = ('PRE', 'POST')
 timepoint_choices = ('D1-PRE', 'D1-POST', 'D2-PRE', 'D2-POST')
 
 
-class Proteomic(mongoengine.EmbeddedDocument):
+class Cytokine(mongoengine.EmbeddedDocument):
     created_by = mongoengine.ReferenceField(User, required=True)
     created_date = mongoengine.DateTimeField(required=True)
     last_modified_by = mongoengine.ReferenceField(User, required=True)
@@ -42,8 +39,3 @@ class Proteomic(mongoengine.EmbeddedDocument):
     pipeline = mongoengine.StringField()
 
     assay_results = mongoengine.EmbeddedDocumentListField(AssayResults)
-
-    # time = mongoengine.StringField(required=True, choices=time_choices)
-    # cpet_day = mongoengine.StringField(choices=cpet_day_choice)
-    # pre_post_cpet = mongoengine.StringField(choices=pre_post_cpet_choice)
-    # run = mongoengine.StringField(required=True)

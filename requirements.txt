@@ -1,8 +1,9 @@
 numpy==1.19.3
-pandas
+pandas==1.2.0
 pymongo
 mongoengine
 tqdm
 colorama
 python-dateutil
 xlrd
+openpyxl

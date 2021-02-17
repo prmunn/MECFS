@@ -43,12 +43,12 @@ mongo_setup.global_init(database_name=set_up_globals.database_name)
 
 # -------------------------------------------------------------------------------------
 # Import data into pandas
-scrnaseq_summary_data_list = svc.find_only_scrnaseq_summary_data()
+scrnaseq_summary_data_list = svc.find_scrnaseq_summary_data_only()
 if scrnaseq_summary_data_list is None:
     print(f'No scRNA-seq summary records.')
     sys.exit(2)
 
-df = utilities.create_df_from_object_list(scrnaseq_summary_data_list, ScRNAseqSummary, 'scrnaseq_summary')
+df,_ = utilities.create_df_from_object_list(scrnaseq_summary_data_list, ScRNAseqSummary, 'scrnaseq_summary')
 print(df.head(5))
 
 # Creating an ID column name gives us more interactive capabilities
@@ -136,13 +136,16 @@ def update_3d_scatter(all_rows_data, slctd_row_indices, slct_rows_names, slctd_r
     y_eye = 2
     z_eye = 0.5
 
+    group_chosen = 'phenotype'
+    colorSequence = utilities.set_color_sequence(group_chosen)
+
     fig = px.scatter_3d(
         data_frame=dff,
         x=slctd_columns[0],
         y=slctd_columns[1],
         z=slctd_columns[2],
-        color='phenotype',
-        color_discrete_sequence=['magenta', 'green'],
+        color=group_chosen,
+        color_discrete_sequence=colorSequence,
         template='ggplot2',
         title='scRNA-seq Summary 3D Scatter Plot',
         size='size',  # size of bubble

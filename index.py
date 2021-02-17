@@ -8,10 +8,13 @@ from app import app
 from app import server
 
 # Connect to your app pages
+from apps import mecfs_dash_app_clinical_data_lineplots
+from apps import mecfs_dash_app_clinical_data_filters
+from apps import mecfs_dash_app_clinical_data_sunburst
+from apps import mecfs_dash_app_cytokine_data_filters
 from apps import mecfs_dash_app_scrna_summary_3dscatterplot
 from apps import mecfs_dash_app_scrna_summary_lineplots
 from apps import mecfs_dash_app_scrna_summary_barplots
-
 
 # the style arguments for the sidebar. We use position:fixed and a fixed width
 SIDEBAR_STYLE = {
@@ -42,15 +45,19 @@ card_sidebar = html.Div(
                     title="Genomics Innovation Hub", alt='Rotating DNA'),
         dbc.CardBody(
             [
-                html.H4("Genome Innovation Hub", className="card-title"),
-                html.Br(),
-                html.H6("ME/CFS Database:", className="card-subtitle"),
+                # html.H3("Genomics Innovation Hub", className="card-title", style={"text-align": "center"}),
+                # html.Br(),
+                html.H3("ME/CFS Database", className="card-subtitle", style={"text-align": "center"}),
                 html.Br(),
                 dbc.Nav(
                     [
-                        dbc.NavLink("scRNA-seq Scatter Plot", href="/page-1", id="page-1-link"),
-                        dbc.NavLink("scRNA-seq Line Plot", href="/page-2", id="page-2-link"),
-                        dbc.NavLink("scRNA-seq Bar Plots", href="/page-3", id="page-3-link"),
+                        dbc.NavLink("Demographic Line Plot", href="/page-1", id="page-1-link", active='exact'),
+                        dbc.NavLink("Demographic Filter Example", href="/page-2", id="page-2-link", active='exact'),
+                        dbc.NavLink("Demographic Sunburst", href="/page-3", id="page-3-link", active='exact'),
+                        dbc.NavLink("Cytokine Data Simple Filters", href="/page-4", id="page-4-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Scatter Plot", href="/page-5", id="page-5-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Line Plot", href="/page-6", id="page-6-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Bar Plots", href="/page-7", id="page-7-link", active='exact'),
                         # dbc.NavLink("Page 4", href="/page-4", id="page-4-link"),
                     ],
                     vertical=True,
@@ -60,10 +67,12 @@ card_sidebar = html.Div(
         ),
     ],
     color="dark",   # https://bootswatch.com/default/ for more card colors
+    style={"height":"100vh", "width":"18rem", "left": 0, "position":"fixed"},
     inverse=True,   # change color of text (black or white)
     outline=False,  # True = remove the block colors from the background and header
     )],
-    style=SIDEBAR_STYLE,
+    # style={"width": "18rem"},
+    # style=SIDEBAR_STYLE,
 )
 
 # sidebar = html.Div(
@@ -87,10 +96,19 @@ card_sidebar = html.Div(
 #     style=SIDEBAR_STYLE,
 # )
 
-content = html.Div(id="page-content", style=CONTENT_STYLE, children=[])
+content = html.Div(id="page-content", style={"padding": "2rem"}, children=[])
 
-app.layout = html.Div([dcc.Location(id="url"), card_sidebar, content])
+# content = html.Div(id="page-content", style=CONTENT_STYLE, children=[])
 
+app.layout = dbc.Container([
+    dcc.Location(id='url'),
+    dbc.Row([
+        dbc.Col(card_sidebar, width=2),
+        dbc.Col(content, width=9, style={"margin-left": "20rem"})
+    ])
+], fluid=True)
+
+# app.layout = html.Div([dcc.Location(id="url"), card_sidebar, content])
 
 # app.layout = html.Div([
 #     dcc.Location(id='url', refresh=False),
@@ -105,14 +123,14 @@ app.layout = html.Div([dcc.Location(id="url"), card_sidebar, content])
 # this callback uses the current pathname to set the active state of the
 # corresponding nav link to true, allowing users to tell see page they are on
 @app.callback(
-    [Output(f"page-{i}-link", "active") for i in range(1, 4)],
+    [Output(f"page-{i}-link", "active") for i in range(1, 8)],
     [Input("url", "pathname")],
 )
 def toggle_active_links(pathname):
     if pathname == "/":
         # Treat page 1 as the homepage / index
-        return True, False, False
-    return [pathname == f"/page-{i}" for i in range(1, 4)]
+        return True, False, False, False, False, False, False
+    return [pathname == f"/page-{i}" for i in range(1, 8)]
 
 
 @app.callback(Output('page-content', 'children'),
@@ -125,10 +143,18 @@ def display_page(pathname):
     # else:
     #     return "404 Page Error! Please choose a link"
     if pathname in ["/", "/page-1"]:
-        return mecfs_dash_app_scrna_summary_3dscatterplot.layout
+        return mecfs_dash_app_clinical_data_lineplots.layout
     elif pathname == "/page-2":
-        return mecfs_dash_app_scrna_summary_lineplots.layout
+        return mecfs_dash_app_clinical_data_filters.layout
     elif pathname == "/page-3":
+        return mecfs_dash_app_clinical_data_sunburst.layout
+    elif pathname == "/page-4":
+        return mecfs_dash_app_cytokine_data_filters.layout
+    elif pathname == "/page-5":
+        return mecfs_dash_app_scrna_summary_3dscatterplot.layout
+    elif pathname == "/page-6":
+        return mecfs_dash_app_scrna_summary_lineplots.layout
+    elif pathname == "/page-7":
         return mecfs_dash_app_scrna_summary_barplots.layout
     # elif pathname == "/page-4":
     #     return dbc.Jumbotron(html.H1("Oh cool, this is page 4!", className="text-success"))

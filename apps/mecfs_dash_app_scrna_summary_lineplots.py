@@ -34,12 +34,12 @@ mongo_setup.global_init(database_name=set_up_globals.database_name)
 
 # -------------------------------------------------------------------------------------
 # Import data into pandas
-scrnaseq_summary_data_list = svc.find_only_scrnaseq_summary_data()
+scrnaseq_summary_data_list = svc.find_scrnaseq_summary_data_only()
 if scrnaseq_summary_data_list is None:
     print(f'No scRNA-seq summary records.')
     sys.exit(2)
 
-df = utilities.create_df_from_object_list(scrnaseq_summary_data_list, ScRNAseqSummary, 'scrnaseq_summary')
+df,_ = utilities.create_df_from_object_list(scrnaseq_summary_data_list, ScRNAseqSummary, 'scrnaseq_summary')
 print(df.head(5))
 
 # Creating an ID column name gives us more interactive capabilities
@@ -113,6 +113,8 @@ def update_line(all_rows_data, slctd_row_indices, slct_rows_names, slctd_rows,
             data.append(dataRow)
     dff = pd.DataFrame(data, columns=['sample_name', 'column_name', 'value'])
 
+    colorSequence = utilities.set_color_sequence()
+
     # used to highlight selected countries on bar chart
     colors = ['#7FDBFF' if i in slctd_row_indices else '#0074D9'
               for i in range(len(dff))]
@@ -123,7 +125,8 @@ def update_line(all_rows_data, slctd_row_indices, slct_rows_names, slctd_rows,
                       data_frame=dff,
                       x='sample_name',
                       y='value',
-                      color='column_name'
+                      color='column_name',
+                      color_discrete_sequence=colorSequence
                   ).update_layout(showlegend=True,
                                   # xaxis={'categoryorder': 'total ascending'},
                                   yaxis={'title': 'Values'},

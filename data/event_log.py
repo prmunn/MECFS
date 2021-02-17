@@ -1,5 +1,6 @@
 import datetime
 import mongoengine
+# from mongoengine.queryset.visitor import Q
 from data.users import User
 
 event_type_choice = ('Import',
@@ -22,6 +23,10 @@ class Event_log(mongoengine.Document):
     document_id = mongoengine.StringField()
     sub_document_id = mongoengine.StringField()
     comment = mongoengine.StringField()
+
+    @mongoengine.queryset_manager
+    def find_failures(doc_cls, queryset):
+        return queryset.filter(success=False).order_by('-created_date')
 
     # @property
     # def days_since_received(self):
