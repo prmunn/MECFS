@@ -48,7 +48,7 @@ if scrnaseq_summary_data_list is None:
     print(f'No scRNA-seq summary records.')
     sys.exit(2)
 
-df,_ = utilities.create_df_from_object_list(scrnaseq_summary_data_list, ScRNAseqSummary, 'scrnaseq_summary')
+df,_ = utilities.create_df_from_object_list(scrnaseq_summary_data_list, [ScRNAseqSummary], ['scrnaseq_summary'])
 print(df.head(5))
 
 # Creating an ID column name gives us more interactive capabilities

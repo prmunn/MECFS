@@ -30,11 +30,24 @@ proteomics_document_name = 'Proteomics'
 cytokines_document_name = 'Cytokines'
 metabolomics_document_name = 'Metabolomics'
 scrnaseq_summary_document_name = 'scRNA-seq summary'
-
 data_label_type_document_name = 'data label type'
+data_label_pathway_document_name = 'data label pathway'
+
 gene_symbol_data_label_type = 'Gene Symbol'
 ensembl_gene_id_data_label_type = 'Ensembl Gene ID'
 cytokine_data_label_type = 'Cytokine Label'
+metabolomics_data_label_type = 'Compound ID'
+
+# //--- replace hardcoding with global reference
+data_label_type_choices = (gene_symbol_data_label_type,
+                           'NCBI GeneID',
+                           'NCBI RefSeq ID',
+                           ensembl_gene_id_data_label_type,
+                           'Ensembl TranscriptID',
+                           cytokine_data_label_type,
+                           metabolomics_data_label_type,
+                           'Other')
+data_label_type_list = [val for val in data_label_type_choices]
 
 gene_symbol_to_ensembl_geneid_ref = 'Gene Symbol to Ensembl Gene ID'
 gene_symbol_to_cytokine_label_ref = 'Gene Symbol to Cytokine Label'

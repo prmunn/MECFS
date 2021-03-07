@@ -24,11 +24,13 @@ from data.biospecimens import Biospecimen, BiospecimenVersionHistory, Biospecime
 from data.users import User
 from data.event_log import Event_log
 from data.assay_results import AssayResults
-from data.data_label_types import GeneSymbols
-from data.data_label_types import EnsemblTranscriptIDs
-from data.data_label_types import EnsemblGeneIDs
-from data.data_label_types import CytokineLabels
-from data.data_label_types import GeneSymbolsToEnsemblGeneIDs
+from data.data_label_types import DataLabels
+from data.data_label_types import DataLabelPathways
+# from data.data_label_types import GeneSymbols
+# from data.data_label_types import EnsemblTranscriptIDs
+# from data.data_label_types import EnsemblGeneIDs
+# from data.data_label_types import CytokineLabels
+# from data.data_label_types import GeneSymbolsToEnsemblGeneIDs
 from mongoengine.queryset.visitor import Q
 
 import set_up_globals
@@ -109,6 +111,29 @@ def find_scrnaseq_summary_data_only() -> List[ClinicalData]:
     # return list(
     #     ClinicalData.objects(scrnaseq_summary__sampleid__exists=True).only('study_id', 'phenotype', 'site', 'sex',
     #                                                               'age', 'scrnaseq_summary').order_by('phenotype'))
+
+
+def find_pathway_data(pathway_name: str) -> DataLabelPathways:
+    return DataLabelPathways.objects(pathway_name=pathway_name).first()
+
+
+def test_pathway_mapping() -> List[ClinicalData]:
+    # pathway = DataLabelPathways.objects(pathway_name=pathway_name).first()
+    # print('pathway_labels:', pathway.data_label_references)
+    # query = ClinicalData.objects(Q(study_id=101) & Q(proteomic__assay_results__data_label_reference__in=pathway.data_label_references)).only('study_id').only('phenotype').only('proteomic').only('cytokine').order_by('study_id')
+    # query = ClinicalData.objects(study_id=101).only('study_id').only('phenotype').only('proteomic').only('cytokine').order_by('study_id')
+    # query = ClinicalData.objects(study_id=101).fields(proteomic__assay_results__data_label_reference=pathway.data_label_references)
+    # query = ClinicalData.objects(study_id=101).fields(elemMatch__proteomic__assay_results__data_label='A2M')
+    return list(ClinicalData.objects().exclude('biospecimen_data_references',
+                                               'redcap',
+                                               'metabolomic',
+                                               'scrnaseq_summary').order_by('phenotype'))
+
+
+def test_pathway_average(pathway):
+    result_ave = ClinicalData.objects().average('age')
+    # result_sum = ClinicalData.objects(Q(study_id=101) & Q(proteomic__assay_results__data_label_reference__in=pathway.data_label_references)).sum('proteomic.assay_results.result')
+    return result_ave
 
 
 # Return a string for field that can be either a string or an integer
@@ -307,23 +332,39 @@ def add_common_data(active_account: User, row, dataClass, metaDataDict):
             assay_results.data_label = data_label
 
         assay_results.result = result
-        if metaDataDict['data_label_type'].strip() == set_up_globals.gene_symbol_data_label_type:
-            gene_symbol_reference = find_gene_symbol_reference(data_label)
-            if gene_symbol_reference:
-                assay_results.gene_symbol_reference = gene_symbol_reference
-            else:
-                # Flag error if gene symbol does not exist
-                message = f"Error in save of assay data: {metaDataDict['data_label_type'].strip()} {data_label} not found"
-                add_event_log(active_account,
-                              message,
-                              success=False,
-                              event_type='Import',
-                              file_name=row.data_file_name,
-                              document_id=str(dataClass.unique_id),
-                              sub_document_id=str(data_label))
-                error_msg(message)
 
-        # //--- test for other data label types
+        data_label_ref = find_data_label_reference(data_label, metaDataDict['data_label_type'].strip())
+        if data_label_ref:
+            assay_results.data_label_reference = data_label_ref
+        else:
+            # Flag error if gene symbol does not exist
+            message = f"Error in save of assay data: {metaDataDict['data_label_type'].strip()} {data_label} not found"
+            add_event_log(active_account,
+                          message,
+                          success=False,
+                          event_type='Import',
+                          file_name=row.data_file_name,
+                          document_id=str(dataClass.unique_id),
+                          sub_document_id=str(data_label))
+            error_msg(message)
+
+        # if metaDataDict['data_label_type'].strip() == set_up_globals.gene_symbol_data_label_type:
+        #     gene_symbol_reference = find_gene_symbol_reference(data_label)
+        #     if gene_symbol_reference:
+        #         assay_results.gene_symbol_reference = gene_symbol_reference
+        #     else:
+        #         # Flag error if gene symbol does not exist
+        #         message = f"Error in save of assay data: {metaDataDict['data_label_type'].strip()} {data_label} not found"
+        #         add_event_log(active_account,
+        #                       message,
+        #                       success=False,
+        #                       event_type='Import',
+        #                       file_name=row.data_file_name,
+        #                       document_id=str(dataClass.unique_id),
+        #                       sub_document_id=str(data_label))
+        #         error_msg(message)
+        #
+        # # //--- test for other data label types
 
         if newAssayResults:
             dataClass.assay_results.append(assay_results)
@@ -346,7 +387,8 @@ def get_clinical_data_reference(active_account: User, documentName, study_id, da
     return clinical_data
 
 
-def save_clinical_data(active_account: User, clinical_data: ClinicalData, documentName, study_id, data_file_name, sub_document_id):
+def save_clinical_data(active_account: User, clinical_data: ClinicalData, documentName, study_id, data_file_name,
+                       sub_document_id):
     try:
         clinical_data.save()
     except (ValueError, ValidationError) as e:
@@ -820,7 +862,8 @@ def add_biospecimen_data(active_account: User, df, data_file_name):  # -> Biospe
             biospecimen_tube_info = BiospecimenTubeInfo()
 
         biospecimen_tube_info.sample_id = int(row.sample_id)
-        biospecimen_tube_info.date_received = datetime.datetime.strptime(str(row.date_received), '%Y-%m-%d %H:%M:%S').date()
+        biospecimen_tube_info.date_received = datetime.datetime.strptime(str(row.date_received),
+                                                                         '%Y-%m-%d %H:%M:%S').date()
         biospecimen_tube_info.data_file_name = row.data_file_name
         biospecimen_tube_info.tube_number = int(row.tube_number)
         biospecimen_tube_info.freezer_id = row.freezer_id
@@ -884,35 +927,37 @@ def add_biospecimen_data(active_account: User, df, data_file_name):  # -> Biospe
 
     return  # biospecimen_data
 
-def find_gene_symbol_reference(gene_symbol: str) -> GeneSymbols:
-    return GeneSymbols.objects(data_label=gene_symbol).first()
+
+# def find_gene_symbol_reference(gene_symbol: str) -> GeneSymbols:
+#     return GeneSymbols.objects(data_label=gene_symbol).first()
 
 
-def find_ensembl_gene_id_reference(ensembl_gene_id: str) -> EnsemblGeneIDs:
-    return EnsemblGeneIDs.objects(data_label=ensembl_gene_id).first()
+# def find_ensembl_gene_id_reference(ensembl_gene_id: str) -> EnsemblGeneIDs:
+#     return EnsemblGeneIDs.objects(data_label=ensembl_gene_id).first()
 
 
-def find_cytokine_label_reference(cytokine_label: str) -> CytokineLabels:
-    return CytokineLabels.objects(data_label=cytokine_label).first()
+# def find_cytokine_label_reference(cytokine_label: str) -> CytokineLabels:
+#     return CytokineLabels.objects(data_label=cytokine_label).first()
 
 
-def find_gene_symbol_to_ensembl_gene_id_reference_in_data_record(gene_symbol_data: GeneSymbols, ensembl_geneid_data: EnsemblGeneIDs):
-    return GeneSymbolsToEnsemblGeneIDs.objects(Q(gene_symbol_reference=gene_symbol_data.id) & Q(ensembl_geneid_reference=ensembl_geneid_data.id)).first()
+# def find_gene_symbol_to_ensembl_gene_id_reference_in_data_record(gene_symbol_data: GeneSymbols, ensembl_geneid_data: EnsemblGeneIDs):
+#     return GeneSymbolsToEnsemblGeneIDs.objects(Q(gene_symbol_reference=gene_symbol_data.id) & Q(ensembl_geneid_reference=ensembl_geneid_data.id)).first()
 
 
-# def find_gene_symbol_reference_in_data_type_class(cls, id):
-#     return cls.objects(gene_symbol_references=id).first()
+def find_data_label_reference(data_label, data_label_type) -> DataLabels:
+    return DataLabels.objects(Q(data_label=data_label) & Q(data_label_type=data_label_type)).first()
 
 
 def add_data_label_types(active_account: User, df, data_file_name):
     documentName = set_up_globals.data_label_type_document_name
+    data_label_type_list = set_up_globals.data_label_type_list
 
-    gene_symbol_data_label_type = set_up_globals.gene_symbol_data_label_type
-    ensembl_gene_id_data_label_type = set_up_globals.ensembl_gene_id_data_label_type
-    cytokine_data_label_type = set_up_globals.cytokine_data_label_type
-
-    gene_symbol_to_ensembl_geneid_ref = set_up_globals.gene_symbol_to_ensembl_geneid_ref
-    gene_symbol_to_cytokine_label_ref = set_up_globals.gene_symbol_to_cytokine_label_ref
+    # gene_symbol_data_label_type = set_up_globals.gene_symbol_data_label_type
+    # ensembl_gene_id_data_label_type = set_up_globals.ensembl_gene_id_data_label_type
+    # cytokine_data_label_type = set_up_globals.cytokine_data_label_type
+    #
+    # gene_symbol_to_ensembl_geneid_ref = set_up_globals.gene_symbol_to_ensembl_geneid_ref
+    # gene_symbol_to_cytokine_label_ref = set_up_globals.gene_symbol_to_cytokine_label_ref
 
     for index, row in df.iterrows():
 
@@ -923,167 +968,384 @@ def add_data_label_types(active_account: User, df, data_file_name):
                             'IL12B', 'IL12B', 'IL13', 'IL15', 'IL16', 'IL17', 'IL18', 'IL1A', 'IL1B', 'IL1R1', 'IL2',
                             'IL2RA', 'IL3', 'IL4', 'IL5', 'IL6', 'IL7', 'CXCL8', 'IL9', 'CXCL10', 'LIF', 'CSF1',
                             'CCL2', 'CCL7', 'MIF', 'CXCR3', 'CCL3', 'CCL4', 'PDGFB', 'CCL5', 'KITLG', 'SCGF',
-                            'CXCL12', 'TNFB', 'TNFA', 'TNFSF10','VEGF',
+                            'CXCL12', 'TNFB', 'TNFA', 'TNFSF10', 'VEGF',
                             'IL_2ra', 'MIG', 'MIP_1B', 'IL_6', 'IFN_a2', 'IFN_g', 'SDF_1a', 'IL_1ra', 'MCP_3', 'IL_16',
                             'IL_12p40', 'LIF', 'TNF_B', 'IL_5', 'GM_CSF', 'MIF', 'TNFa', 'RANTES', 'IL_2', 'IL_1B',
                             'IL_18', 'Eotaxin', 'bFGF', 'VEGF', 'B_NGF', 'PDGF_BB', 'IP_10', 'IL_13', 'IL_4', 'MCP_1',
-                            'IL_8', 'MIP_1a', 'IL_10', 'G_CSF', 'GROa', 'HGF', 'IL_1a', 'IL_3', 'SCF', 'TRAIL', 'M_CSF'
-                            'CTACK', 'IL_15', 'IL_7', 'IL_12p70', 'IL_17', 'IL_9', 'SCGF_B']
+                            'IL_8', 'MIP_1a', 'IL_10', 'G_CSF', 'GROa', 'HGF', 'IL_1a', 'IL_3', 'SCF', 'TRAIL',
+                            'M_CSF', 'CTACK', 'IL_15', 'IL_7', 'IL_12p70', 'IL_17', 'IL_9', 'SCGF_B']
             if row.gene_name not in testGeneList:
                 continue
 
         # currentVersion = 0
-        gene_symbol_data = find_gene_symbol_reference(row.gene_name)
-        ensembl_gene_id_data = find_ensembl_gene_id_reference(row.gene_stable_id)
-        cytokine_label_data = find_cytokine_label_reference(row.cytokine_label)
 
-        # //--- need to set this up for all data labels
-        # //--- need some way of tracking changes - version history maybe
+        # First, save the data label only, without any references to other data labels
+        # (we need this first step, so that each label exists in the document prior to setting up
+        # reference lists. It sucks that we have to do two save operations, but there's no way around it)
+        for dlt in data_label_type_list:
+            data_label_name = ''
+            if dlt == set_up_globals.gene_symbol_data_label_type:
+                data_label = row.gene_name
+            elif dlt == set_up_globals.ensembl_gene_id_data_label_type:
+                data_label = row.gene_stable_id
+            elif dlt == set_up_globals.cytokine_data_label_type:
+                data_label = row.cytokine_label
+            elif dlt == set_up_globals.metabolomics_data_label_type:
+                data_label = row.comp_id
+                data_label_name = row.biochemical
+            else:
+                # This data label type not coded yet
+                error_msg(f"I haven't written code for data label type {dlt} yet.")
+                continue
+            # //--- set up remaining data label types
 
-        if gene_symbol_data:
-            pass
-            # Instead of keeping a version history, maintain a list of prior values for each label
-            # currentVersion = gene_symbol_data.version_number
-            # gene_symbol_data_version_history = DataLabelTypeVersionHistory()
+            if len(data_label) < 1:
+                # This data label type is not part of this import
+                continue
 
-            # attributeList = utilities.attributes(GeneSymbols)
-            # # print(attributeList)
-            # for attrib in attributeList:
-            #     # print(attrib)
-            #     gene_symbol_data_version_history[attrib] = gene_symbol_data[attrib]
-            # gene_symbol_data_version_history.save()
-        else:
-            # If no data exists for this id, set created info
-            gene_symbol_data = GeneSymbols()
-            # gene_symbol_data.ensembl_geneid_references = []
+            data_label_data = find_data_label_reference(data_label, dlt)
 
-        if not ensembl_gene_id_data:
-            ensembl_gene_id_data = EnsemblGeneIDs()
-            # ensembl_gene_id_data.gene_symbol_references = []
+            if not data_label_data:
+                data_label_data = DataLabels()
 
-        if not cytokine_label_data:
-            cytokine_label_data = CytokineLabels()
+            data_label_data.data_label_type = dlt
+            data_label_data.data_label = data_label
+            if len(data_label_name) > 0:
+                data_label_data.data_label_name = data_label_name
 
-        # gene_symbol_data.data_label_type = gene_symbol_data_label_type
-        # gene_symbol_data.version_number = currentVersion + 1
-        gene_symbol_data.data_label = row.gene_name
-        ensembl_gene_id_data.data_label = row.gene_stable_id
-        cytokine_label_data = row.cytokine_label
+            # Save data label
+            try:
+                data_label_data.save()
+            except (ValueError, ValidationError) as e:
+                message = f'Save of {documentName} data with {dlt}={data_label} resulted in exception: {e}'
+                add_event_log(active_account,
+                              message,
+                              success=False,
+                              event_type='Import',
+                              exception_type=e.__class__.__name__,
+                              file_name=row.data_file_name,
+                              document_id=str(data_label))
+                error_msg(message)
+                continue  # Skip the rest of this loop
 
-        # Save gene symbols
-        try:
-            gene_symbol_data.save()
-        except (ValueError, ValidationError) as e:
-            message = f'Save of {documentName} data with {gene_symbol_data_label_type}={row.gene_name} resulted in exception: {e}'
+            message = f'Added / updated {documentName} data for {dlt}: {data_label} with id {data_label_data.id}.'
             add_event_log(active_account,
                           message,
-                          success=False,
+                          success=True,
                           event_type='Import',
-                          exception_type=e.__class__.__name__,
-                          file_name=row.data_file_name,
-                          document_id=str(row.gene_name))
-            error_msg(message)
-            continue  # Skip the rest of this loop
+                          file_name=data_file_name,
+                          document_id=str(data_label_data.id))
+            success_msg(message)
 
-        message = f'Added / updated {documentName} data for {gene_symbol_data_label_type}: {row.gene_name} with id {gene_symbol_data.id}.'
-        add_event_log(active_account,
-                      message,
-                      success=True,
-                      event_type='Import',
-                      file_name=data_file_name,
-                      document_id=str(gene_symbol_data.id))
-        success_msg(message)
+        # Now we can set up the references to other data labels
+        gene_symbol_ref = find_data_label_reference(row.gene_name, set_up_globals.gene_symbol_data_label_type)
+        ensembl_gene_id_ref = find_data_label_reference(row.gene_stable_id,
+                                                        set_up_globals.ensembl_gene_id_data_label_type)
+        cytokine_label_ref = find_data_label_reference(row.cytokine_label, set_up_globals.cytokine_data_label_type)
+        metabolomic_label_ref = find_data_label_reference(row.comp_id, set_up_globals.metabolomics_data_label_type)
+        # //--- set up remaining data label types
 
-        # Save cytokine labels
-        try:
-            cytokine_label_data.save()
-        except (ValueError, ValidationError) as e:
-            message = f'Save of {documentName} data with {cytokine_data_label_type}={row.cytokine_label} resulted in exception: {e}'
+        for dlt in data_label_type_list:
+            data_label = ''
+            if dlt == set_up_globals.gene_symbol_data_label_type:
+                data_label = row.gene_name
+            elif dlt == set_up_globals.ensembl_gene_id_data_label_type:
+                data_label = row.gene_stable_id
+            elif dlt == set_up_globals.cytokine_data_label_type:
+                data_label = row.cytokine_label
+            elif dlt == set_up_globals.metabolomics_data_label_type:
+                data_label = row.comp_id
+            else:
+                # This data label type not coded yet
+                error_msg(f"I haven't written code for data label type {dlt} yet.")
+                continue
+            # //--- set up remaining data label types
+
+            if len(data_label) < 1:
+                # This data label type is not part of this import
+                continue
+
+            data_label_data = find_data_label_reference(data_label, dlt)
+
+            # //--- check to make sure ref not already in list !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # //--- set up remaining data label types
+            if gene_symbol_ref and gene_symbol_ref not in data_label_data.gene_symbol_references:
+                data_label_data.gene_symbol_references.append(gene_symbol_ref)
+            if ensembl_gene_id_ref and ensembl_gene_id_ref not in data_label_data.ensembl_geneid_references:
+                data_label_data.ensembl_geneid_references.append(ensembl_gene_id_ref)
+            if cytokine_label_ref and cytokine_label_ref not in data_label_data.cytokine_label_references:
+                data_label_data.cytokine_label_references.append(cytokine_label_ref)
+            if metabolomic_label_ref and metabolomic_label_ref not in data_label_data.metabolomic_label_references:
+                data_label_data.metabolomic_label_references.append(metabolomic_label_ref)
+
+            # Save data label
+            try:
+                data_label_data.save()
+            except (ValueError, ValidationError) as e:
+                message = f'Save of {documentName} data with {dlt}={data_label} resulted in exception: {e}'
+                add_event_log(active_account,
+                              message,
+                              success=False,
+                              event_type='Import',
+                              exception_type=e.__class__.__name__,
+                              file_name=row.data_file_name,
+                              document_id=str(data_label))
+                error_msg(message)
+                continue  # Skip the rest of this loop
+
+            message = f'Added / updated {documentName} data for {dlt}: {data_label} with id {data_label_data.id}.'
             add_event_log(active_account,
                           message,
-                          success=False,
+                          success=True,
                           event_type='Import',
-                          exception_type=e.__class__.__name__,
-                          file_name=row.data_file_name,
-                          document_id=str(row.cytokine_label))
-            error_msg(message)
-            continue  # Skip the rest of this loop
-
-        message = f'Added / updated {documentName} data for {cytokine_data_label_type}: {row.cytokine_label} with id {cytokine_label_data.id}.'
-        add_event_log(active_account,
-                      message,
-                      success=True,
-                      event_type='Import',
-                      file_name=data_file_name,
-                      document_id=str(cytokine_label_data.id))
-        success_msg(message)
-
-        # Save ensembl gene ids
-        try:
-            ensembl_gene_id_data.save()
-        except (ValueError, ValidationError) as e:
-            message = f'Save of {documentName} data with {ensembl_gene_id_data_label_type}={row.gene_stable_id} resulted in exception: {e}'
-            add_event_log(active_account,
-                          message,
-                          success=False,
-                          event_type='Import',
-                          exception_type=e.__class__.__name__,
-                          file_name=row.data_file_name,
-                          document_id=str(row.gene_stable_id))
-            error_msg(message)
-            continue  # Skip the rest of this loop
-
-        message = f'Added / updated {documentName} data for {ensembl_gene_id_data_label_type}: {row.gene_stable_id} with id {ensembl_gene_id_data.id}.'
-        add_event_log(active_account,
-                      message,
-                      success=True,
-                      event_type='Import',
-                      file_name=data_file_name,
-                      document_id=str(ensembl_gene_id_data.id))
-        success_msg(message)
-
-        # Set up references to other data label types
-        # //---
-        gene_symbol_to_ensembl_geneid_data = find_gene_symbol_to_ensembl_gene_id_reference_in_data_record(gene_symbol_data, ensembl_gene_id_data)
-        if not gene_symbol_to_ensembl_geneid_data:
-            gene_symbol_to_ensembl_geneid_data = GeneSymbolsToEnsemblGeneIDs()
-            gene_symbol_to_ensembl_geneid_data.gene_symbol_data_label = row.gene_name
-            gene_symbol_to_ensembl_geneid_data.ensembl_geneid_data_label = row.gene_stable_id
-            gene_symbol_to_ensembl_geneid_data.gene_symbol_reference = gene_symbol_data
-            gene_symbol_to_ensembl_geneid_data.ensembl_geneid_reference = ensembl_gene_id_data
-
-        # if ensembl_gene_id_data.id not in gene_symbol_data.ensembl_geneid_references:
-        #     gene_symbol_data.ensembl_geneid_references.append(ensembl_gene_id_data)
-
-        # if gene_symbol_data.id not in ensembl_gene_id_data.gene_symbol_references:
-        #     ensembl_gene_id_data.gene_symbol_references.append(gene_symbol_data)
-
-        # Save gene symbols to ensembl gene ids many-to-many relationship
-        try:
-            gene_symbol_to_ensembl_geneid_data.save()
-        except (ValueError, ValidationError) as e:
-            message = f'Save of {documentName} data with {gene_symbol_to_ensembl_geneid_ref}={row.gene_name} and {row.gene_stable_id} resulted in exception: {e}'
-            add_event_log(active_account,
-                          message,
-                          success=False,
-                          event_type='Import',
-                          exception_type=e.__class__.__name__,
-                          file_name=row.data_file_name,
-                          # document_id=str(row.gene_name)
-                          )
-            error_msg(message)
-            continue  # Skip the rest of this loop
-
-        message = f'Added / updated {documentName} data for {gene_symbol_to_ensembl_geneid_ref}: {row.gene_name} and {row.gene_stable_id} with id {gene_symbol_to_ensembl_geneid_data.id}.'
-        add_event_log(active_account,
-                      message,
-                      success=True,
-                      event_type='Import',
-                      file_name=data_file_name,
-                      document_id=str(gene_symbol_to_ensembl_geneid_data.id))
-        success_msg(message)
+                          file_name=data_file_name,
+                          document_id=str(data_label_data.id))
+            success_msg(message)
 
     return  # data_label_types
+
+
+def find_data_label_pathway_reference(pathway_name) -> DataLabelPathways:
+    return DataLabelPathways.objects(pathway_name=pathway_name).first()
+
+
+def add_data_label_pathways(active_account: User, df, data_file_name):
+    documentName = set_up_globals.data_label_pathway_document_name
+
+    for index, row in df.iterrows():
+        data_label_pathway_data = find_data_label_pathway_reference(index)
+
+        if not data_label_pathway_data:
+            data_label_pathway_data = DataLabelPathways()
+
+        data_label_pathway_data.pathway_name = index
+        data_label_pathway_data.data_label_type = row.data_label_type
+        data_label_pathway_data.description = row.description
+
+        # Add data label reference if not already in list
+        data_label_ref = find_data_label_reference(row.data_label, row.data_label_type)
+        if not data_label_ref:
+            message = f'Data label {row.data_label} does not exist in the data labels table'
+            add_event_log(active_account,
+                          message,
+                          success=False,
+                          event_type='Import',
+                          file_name=data_file_name,
+                          document_id=str(index))
+            error_msg(message)
+            continue  # Skip the rest of this loop
+
+        if data_label_ref in data_label_pathway_data.data_label_references:
+            continue  # Already in list - no need to save
+        else:
+            data_label_pathway_data.data_label_references.append(data_label_ref)
+
+        try:
+            data_label_pathway_data.save()
+        except (ValueError, ValidationError) as e:
+            message = f'Save of {documentName} data with id={index} resulted in exception: {e}'
+            add_event_log(active_account,
+                          message,
+                          success=False,
+                          event_type='Import',
+                          exception_type=e.__class__.__name__,
+                          file_name=data_file_name,
+                          document_id=str(index))
+            error_msg(message)
+            continue  # Skip the rest of this loop
+
+        message = f'Added / updated {documentName} data for pathway: {index} with id {data_label_pathway_data.id}.'
+        add_event_log(active_account,
+                      message,
+                      success=True,
+                      event_type='Import',
+                      file_name=data_file_name,
+                      document_id=str(index))
+        success_msg(message)
+
+    return  # data_label_pathways
+
+
+# def add_data_label_types_old_version(active_account: User, df, data_file_name):  # delete me after testing
+#     documentName = set_up_globals.data_label_type_document_name
+#
+#     gene_symbol_data_label_type = set_up_globals.gene_symbol_data_label_type
+#     ensembl_gene_id_data_label_type = set_up_globals.ensembl_gene_id_data_label_type
+#     cytokine_data_label_type = set_up_globals.cytokine_data_label_type
+#
+#     gene_symbol_to_ensembl_geneid_ref = set_up_globals.gene_symbol_to_ensembl_geneid_ref
+#     gene_symbol_to_cytokine_label_ref = set_up_globals.gene_symbol_to_cytokine_label_ref
+#
+#     for index, row in df.iterrows():
+#
+#         # For testing, only load subset of genes (those starting with 'ACTN')
+#         if set_up_globals.testMode:
+#             testGeneList = ['A2M', 'ACTB', 'ACTN4', 'ACTR3', 'AGT', 'ALB', 'ALDOA', 'AMBP', 'APOA1', 'APOA4', 'APOC1',
+#                             'NGFB', 'FGF2', 'CCL27', 'CCL11', 'CSF3', 'CSF2', 'CXCL1', 'HGF', 'IFNA2', 'IFNG', 'IL10',
+#                             'IL12B', 'IL12B', 'IL13', 'IL15', 'IL16', 'IL17', 'IL18', 'IL1A', 'IL1B', 'IL1R1', 'IL2',
+#                             'IL2RA', 'IL3', 'IL4', 'IL5', 'IL6', 'IL7', 'CXCL8', 'IL9', 'CXCL10', 'LIF', 'CSF1',
+#                             'CCL2', 'CCL7', 'MIF', 'CXCR3', 'CCL3', 'CCL4', 'PDGFB', 'CCL5', 'KITLG', 'SCGF',
+#                             'CXCL12', 'TNFB', 'TNFA', 'TNFSF10','VEGF',
+#                             'IL_2ra', 'MIG', 'MIP_1B', 'IL_6', 'IFN_a2', 'IFN_g', 'SDF_1a', 'IL_1ra', 'MCP_3', 'IL_16',
+#                             'IL_12p40', 'LIF', 'TNF_B', 'IL_5', 'GM_CSF', 'MIF', 'TNFa', 'RANTES', 'IL_2', 'IL_1B',
+#                             'IL_18', 'Eotaxin', 'bFGF', 'VEGF', 'B_NGF', 'PDGF_BB', 'IP_10', 'IL_13', 'IL_4', 'MCP_1',
+#                             'IL_8', 'MIP_1a', 'IL_10', 'G_CSF', 'GROa', 'HGF', 'IL_1a', 'IL_3', 'SCF', 'TRAIL', 'M_CSF'
+#                             'CTACK', 'IL_15', 'IL_7', 'IL_12p70', 'IL_17', 'IL_9', 'SCGF_B']
+#             if row.gene_name not in testGeneList:
+#                 continue
+#
+#         # currentVersion = 0
+#         gene_symbol_data = find_gene_symbol_reference(row.gene_name)
+#         ensembl_gene_id_data = find_ensembl_gene_id_reference(row.gene_stable_id)
+#         cytokine_label_data = find_cytokine_label_reference(row.cytokine_label)
+#
+#         # //--- need to set this up for all data labels
+#         # //--- need some way of tracking changes - version history maybe
+#
+#         if gene_symbol_data:
+#             pass
+#             # Instead of keeping a version history, maintain a list of prior values for each label
+#             # currentVersion = gene_symbol_data.version_number
+#             # gene_symbol_data_version_history = DataLabelTypeVersionHistory()
+#
+#             # attributeList = utilities.attributes(GeneSymbols)
+#             # # print(attributeList)
+#             # for attrib in attributeList:
+#             #     # print(attrib)
+#             #     gene_symbol_data_version_history[attrib] = gene_symbol_data[attrib]
+#             # gene_symbol_data_version_history.save()
+#         else:
+#             # If no data exists for this id, set created info
+#             gene_symbol_data = GeneSymbols()
+#             # gene_symbol_data.ensembl_geneid_references = []
+#
+#         if not ensembl_gene_id_data:
+#             ensembl_gene_id_data = EnsemblGeneIDs()
+#             # ensembl_gene_id_data.gene_symbol_references = []
+#
+#         if not cytokine_label_data:
+#             cytokine_label_data = CytokineLabels()
+#
+#         # gene_symbol_data.data_label_type = gene_symbol_data_label_type
+#         # gene_symbol_data.version_number = currentVersion + 1
+#         gene_symbol_data.data_label = row.gene_name
+#         ensembl_gene_id_data.data_label = row.gene_stable_id
+#         cytokine_label_data = row.cytokine_label
+#
+#         # Save gene symbols
+#         try:
+#             gene_symbol_data.save()
+#         except (ValueError, ValidationError) as e:
+#             message = f'Save of {documentName} data with {gene_symbol_data_label_type}={row.gene_name} resulted in exception: {e}'
+#             add_event_log(active_account,
+#                           message,
+#                           success=False,
+#                           event_type='Import',
+#                           exception_type=e.__class__.__name__,
+#                           file_name=row.data_file_name,
+#                           document_id=str(row.gene_name))
+#             error_msg(message)
+#             continue  # Skip the rest of this loop
+#
+#         message = f'Added / updated {documentName} data for {gene_symbol_data_label_type}: {row.gene_name} with id {gene_symbol_data.id}.'
+#         add_event_log(active_account,
+#                       message,
+#                       success=True,
+#                       event_type='Import',
+#                       file_name=data_file_name,
+#                       document_id=str(gene_symbol_data.id))
+#         success_msg(message)
+#
+#         # Save cytokine labels
+#         try:
+#             cytokine_label_data.save()
+#         except (ValueError, ValidationError) as e:
+#             message = f'Save of {documentName} data with {cytokine_data_label_type}={row.cytokine_label} resulted in exception: {e}'
+#             add_event_log(active_account,
+#                           message,
+#                           success=False,
+#                           event_type='Import',
+#                           exception_type=e.__class__.__name__,
+#                           file_name=row.data_file_name,
+#                           document_id=str(row.cytokine_label))
+#             error_msg(message)
+#             continue  # Skip the rest of this loop
+#
+#         message = f'Added / updated {documentName} data for {cytokine_data_label_type}: {row.cytokine_label} with id {cytokine_label_data.id}.'
+#         add_event_log(active_account,
+#                       message,
+#                       success=True,
+#                       event_type='Import',
+#                       file_name=data_file_name,
+#                       document_id=str(cytokine_label_data.id))
+#         success_msg(message)
+#
+#         # Save ensembl gene ids
+#         try:
+#             ensembl_gene_id_data.save()
+#         except (ValueError, ValidationError) as e:
+#             message = f'Save of {documentName} data with {ensembl_gene_id_data_label_type}={row.gene_stable_id} resulted in exception: {e}'
+#             add_event_log(active_account,
+#                           message,
+#                           success=False,
+#                           event_type='Import',
+#                           exception_type=e.__class__.__name__,
+#                           file_name=row.data_file_name,
+#                           document_id=str(row.gene_stable_id))
+#             error_msg(message)
+#             continue  # Skip the rest of this loop
+#
+#         message = f'Added / updated {documentName} data for {ensembl_gene_id_data_label_type}: {row.gene_stable_id} with id {ensembl_gene_id_data.id}.'
+#         add_event_log(active_account,
+#                       message,
+#                       success=True,
+#                       event_type='Import',
+#                       file_name=data_file_name,
+#                       document_id=str(ensembl_gene_id_data.id))
+#         success_msg(message)
+#
+#         # Set up references to other data label types
+#         # //---
+#         gene_symbol_to_ensembl_geneid_data = find_gene_symbol_to_ensembl_gene_id_reference_in_data_record(gene_symbol_data, ensembl_gene_id_data)
+#         if not gene_symbol_to_ensembl_geneid_data:
+#             gene_symbol_to_ensembl_geneid_data = GeneSymbolsToEnsemblGeneIDs()
+#             gene_symbol_to_ensembl_geneid_data.gene_symbol_data_label = row.gene_name
+#             gene_symbol_to_ensembl_geneid_data.ensembl_geneid_data_label = row.gene_stable_id
+#             gene_symbol_to_ensembl_geneid_data.gene_symbol_reference = gene_symbol_data
+#             gene_symbol_to_ensembl_geneid_data.ensembl_geneid_reference = ensembl_gene_id_data
+#
+#         # if ensembl_gene_id_data.id not in gene_symbol_data.ensembl_geneid_references:
+#         #     gene_symbol_data.ensembl_geneid_references.append(ensembl_gene_id_data)
+#
+#         # if gene_symbol_data.id not in ensembl_gene_id_data.gene_symbol_references:
+#         #     ensembl_gene_id_data.gene_symbol_references.append(gene_symbol_data)
+#
+#         # Save gene symbols to ensembl gene ids many-to-many relationship
+#         try:
+#             gene_symbol_to_ensembl_geneid_data.save()
+#         except (ValueError, ValidationError) as e:
+#             message = f'Save of {documentName} data with {gene_symbol_to_ensembl_geneid_ref}={row.gene_name} and {row.gene_stable_id} resulted in exception: {e}'
+#             add_event_log(active_account,
+#                           message,
+#                           success=False,
+#                           event_type='Import',
+#                           exception_type=e.__class__.__name__,
+#                           file_name=row.data_file_name,
+#                           # document_id=str(row.gene_name)
+#                           )
+#             error_msg(message)
+#             continue  # Skip the rest of this loop
+#
+#         message = f'Added / updated {documentName} data for {gene_symbol_to_ensembl_geneid_ref}: {row.gene_name} and {row.gene_stable_id} with id {gene_symbol_to_ensembl_geneid_data.id}.'
+#         add_event_log(active_account,
+#                       message,
+#                       success=True,
+#                       event_type='Import',
+#                       file_name=data_file_name,
+#                       document_id=str(gene_symbol_to_ensembl_geneid_data.id))
+#         success_msg(message)
+#
+#     return  # data_label_types
 
 
 def add_event_log(active_account: User,

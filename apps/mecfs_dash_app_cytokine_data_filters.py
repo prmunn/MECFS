@@ -50,7 +50,7 @@ if data_list is None:
     print(f'No {documentName} data records.')
     sys.exit(2)
 
-df, dataGeneSymbolList = utilities.create_df_from_object_list(data_list, Cytokine, 'cytokine', assayResultsFlag=True)
+df, dataGeneSymbolList = utilities.create_df_from_object_list(data_list, [Cytokine], ['cytokine'], assayResultsFlag=True)
 print(df.head(5))
 
 # Creating an ID column name gives us more interactive capabilities

@@ -48,7 +48,7 @@ if data_list is None:
     print(f'No {documentName} data records.')
     sys.exit(2)
 
-df,_ = utilities.create_df_from_object_list(data_list, Proteomic, 'proteomic')
+df,_ = utilities.create_df_from_object_list(data_list, [Proteomic], ['proteomic'])
 print(df.head(5))
 
 # Creating an ID column name gives us more interactive capabilities
@@ -82,7 +82,7 @@ layout = html.Div([
     html.Br(),
     html.Div([
         html.Div(dcc.Dropdown(
-            id=groupDropdownComponentID, value='qmep_metimediagnosis', clearable=False,
+            id=groupDropdownComponentID, value='phenotype', clearable=False,
             options=[{'label': x, 'value': x} for x in clinicalGroupList],
             multi=False,
             searchable=True,
@@ -91,7 +91,7 @@ layout = html.Div([
         ), className='two columns', style={"width": "15rem"}),
 
         html.Div(dcc.Dropdown(
-            id=comparison1DropdownComponentID, value='race', clearable=False,
+            id=comparison1DropdownComponentID, value='sex', clearable=False,
             persistence=True, persistence_type='memory',
             options=[{'label': x, 'value': x} for x in clinicalGroupList],
             multi=False,
@@ -111,7 +111,7 @@ layout = html.Div([
         ), className='two columns', style={"width": "15rem"}),
 
         html.Div(dcc.Dropdown(
-            id=comparison3DropdownComponentID, value='qmep_sudevent', clearable=False,
+            id=comparison3DropdownComponentID, value='race', clearable=False,
             persistence=True, persistence_type='memory',
             options=[{'label': x, 'value': x} for x in ['none'] + clinicalGroupList],
             multi=False,

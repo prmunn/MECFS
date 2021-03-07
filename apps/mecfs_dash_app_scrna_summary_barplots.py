@@ -68,7 +68,7 @@ if scrnaseq_summary_data_list is None:
 #
 # df = pd.DataFrame(dataList, columns=attribute_names)
 
-df,_ = utilities.create_df_from_object_list(scrnaseq_summary_data_list, ScRNAseqSummary, 'scrnaseq_summary')
+df,_ = utilities.create_df_from_object_list(scrnaseq_summary_data_list, [ScRNAseqSummary], ['scrnaseq_summary'])
 print(df.head(5))
 
 # db = 'mecfs_db_test1'

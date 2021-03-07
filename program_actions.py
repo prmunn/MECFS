@@ -24,6 +24,7 @@ from data.assay_classes import Cytokine
 from data.assay_classes import Metabolomic
 
 import pandas as pd
+import numpy as np
 
 # Set up globals
 import set_up_globals
@@ -60,7 +61,10 @@ def main():
                 # s.case('p', import_proteomics_data)
                 s.case('scrna', import_scrnaseq_summary_data)
                 s.case('dlt', import_data_label_types)
+                s.case('compids', import_compound_ids)
+                s.case('pathways', import_pathway_data)
                 s.case('cdlt', combine_data_label_types)
+                s.case('tp', test_pathway_mapping)
                 s.case('vc', list_clinical_data)
                 s.case('vb', list_biospecimen_data_for_study_id)
                 s.case('vsc', list_biospecimen_data_for_scrnaseq_summary)
@@ -86,7 +90,10 @@ def show_commands():
     # print('Import [p]roteomics data')
     print('[scRNA] Import scRNA-seq summary data')
     print('[dlt] Import data label types')
+    print('[compids] Import compound IDs')
+    print('[pathways] Import pathway data')
     print('[cdlt] Combine data label types')
+    print('[tp] Test pathway mapping across two assays')
     print(f'[vc] View {set_up_globals.clinical_document_name} data')
     print('[vb] View biospecimen data for a study ID')
     print('[vsc] View biospecimen data for each scRNA-seq summary')
@@ -242,6 +249,16 @@ def create_custom_columns(df, documentName, data_file_name, index_column=None):
 
     if documentName == set_up_globals.data_label_type_document_name:
         df['unique_id'] = df.index
+        if 'comp_id' not in df.columns:
+            df['comp_id'] = ''
+            df['biochemical'] = ''
+        if 'gene_name' not in df.columns:
+            df['gene_name'] = ''
+        if 'gene_stable_id' not in df.columns:
+            df['gene_stable_id'] = ''
+        if 'cytokine_label' not in df.columns:
+            df['cytokine_label'] = ''
+        # //--- set up remaining data labels - let's do this without the hardcoding
 
 
 def import_data(documentName, index_column, verifyIntegrityFlag=True, sheet_name=0, skiprows=None):
@@ -394,26 +411,6 @@ def import_assay_data():
 
     df.columns = modify_df_column_names(df.columns, classColumnList)
 
-    # # Set up unique_id column
-    # index_column = metaDataDict['sample_identifier_type']
-    # if index_column == 'AnalysisID':
-    #     df.dropna(axis=0, subset=[index_column], inplace=True)  # Remove nulls from index
-    #     # //--- flag null value in the event log
-    #     df['unique_id'] = df[index_column]
-    # elif index_column == 'ENID+Timepoint':
-    #     # //--- flag null values in the event log
-    #     # //--- I'm sure there's a way of doing this in one line, but this way is more readable : )
-    #     unique_id_list = []
-    #     for index, row in df.iterrows():
-    #         unique_id_list.append(str(int(row.study_id)) + '-' + row.timepoint + '-' + data_file_name)
-    #     df['unique_id'] = unique_id_list
-    # else:
-    #     error_msg(f'Error: {index_column} is not a valid sample identifier type')
-    #     error_msg('Exiting data load')
-    #     return  # None, None
-    #
-    # df.set_index('unique_id', drop=False, inplace=True, verify_integrity=True)
-
     # Create custom columns
     create_custom_columns(df, documentName, data_file_name, metaDataDict['sample_identifier_type'])
 
@@ -470,6 +467,18 @@ def combine_data_label_types():
     # Write combined df to new spreadsheet
     output_data_file_name = 'combined_gene_names_and_cytokines.xlsx'
     df.to_excel(data_folder + output_data_file_name)
+
+
+def import_compound_ids():
+    documentName = set_up_globals.data_label_type_document_name
+    df, data_file_name = import_data(documentName, 'comp_id', verifyIntegrityFlag=False)
+    svc.add_data_label_types(state.active_account, df, data_file_name)
+
+
+def import_pathway_data():
+    documentName = set_up_globals.data_label_pathway_document_name
+    df, data_file_name = import_data(documentName, 'pathway_name', verifyIntegrityFlag=False)
+    svc.add_data_label_pathways(state.active_account, df, data_file_name)
 
 
 def import_clinical_data():
@@ -562,6 +571,45 @@ def import_scrnaseq_summary_data():
     #                                                      row)
     #     success_msg(
     #         f'Added / updated {documentName} data for ENID: {clinical_data.study_id} with id {index}.')
+
+
+def test_pathway_mapping():
+    print(' ********************     Test pathway mapping     ******************** ')
+
+    pathway_name = 'Cytokine / proteomic test'
+    dataLabelPathwayIDs = svc.find_pathway_data(pathway_name)
+
+    for idx, c in enumerate(dataLabelPathwayIDs.data_label_references):
+        print(' {}. {}: {}'.format(idx + 1, c.data_label, c.gene_symbol_references[0].data_label))
+
+    data_list = svc.test_pathway_mapping()
+    df, dataGeneSymbolList = utilities.create_df_from_object_list(data_list,
+                                                                  [Proteomic, Cytokine],
+                                                                  ['proteomic', 'cytokine'],
+                                                                  assayResultsFlag=True,
+                                                                  dataLabelPathwayIDs=dataLabelPathwayIDs)
+    print('dataGeneSymbolList:', dataGeneSymbolList)
+    print(df.head(15))
+    print(df.columns)
+
+    print(f"There are {len(df)} records.")
+    df['aggregated_result'] = 0
+    for idx, c in df.iterrows():
+        print(' {}. {}: {}'.format(idx + 1, c.study_id,
+                                   'ME/CFS patient' if c.phenotype == 'ME/CFS' else 'Healthy control'))
+        print('      * Assay summary: {}, {}'.format(c.assay_type, c.timepoint))
+        arList = []
+        for ar in dataGeneSymbolList:
+            if not np.isnan(c[ar]):
+                arList.append(c[ar])
+            print('            * Results: {}, {}'.format(ar, c[ar]))
+        print(np.ma.average(arList))
+        df.loc[idx, 'aggregated_result'] = np.ma.average(arList)
+
+    print(df.head(15))
+
+    # results_ave = svc.test_pathway_average(dataLabelPathwayIDs)
+    # print('results_ave:', results_ave)
 
 
 def list_clinical_data(suppress_header=False):

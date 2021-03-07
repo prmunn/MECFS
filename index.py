@@ -8,10 +8,12 @@ from app import app
 from app import server
 
 # Connect to your app pages
+from apps import mecfs_dash_app_proteomic_cytokine_comparison
 from apps import mecfs_dash_app_clinical_data_lineplots
 from apps import mecfs_dash_app_clinical_data_filters
 from apps import mecfs_dash_app_clinical_data_sunburst
 from apps import mecfs_dash_app_cytokine_data_filters
+from apps import mecfs_dash_app_metabolomic_violin_plots
 from apps import mecfs_dash_app_scrna_summary_3dscatterplot
 from apps import mecfs_dash_app_scrna_summary_lineplots
 from apps import mecfs_dash_app_scrna_summary_barplots
@@ -51,13 +53,15 @@ card_sidebar = html.Div(
                 html.Br(),
                 dbc.Nav(
                     [
-                        dbc.NavLink("Demographic Line Plot", href="/page-1", id="page-1-link", active='exact'),
-                        dbc.NavLink("Demographic Filter Example", href="/page-2", id="page-2-link", active='exact'),
-                        dbc.NavLink("Demographic Sunburst", href="/page-3", id="page-3-link", active='exact'),
-                        dbc.NavLink("Cytokine Data Simple Filters", href="/page-4", id="page-4-link", active='exact'),
-                        dbc.NavLink("scRNA-seq Scatter Plot", href="/page-5", id="page-5-link", active='exact'),
-                        dbc.NavLink("scRNA-seq Line Plot", href="/page-6", id="page-6-link", active='exact'),
-                        dbc.NavLink("scRNA-seq Bar Plots", href="/page-7", id="page-7-link", active='exact'),
+                        # dbc.NavLink("Demographic Line Plot", href="/page-1", id="page-1-link", active='exact'),
+                        dbc.NavLink("Demographic Sunburst", href="/page-1", id="page-1-link", active='exact'),
+                        dbc.NavLink("Demographic Scatter Plot", href="/page-2", id="page-2-link", active='exact'),
+                        dbc.NavLink("Cytokine Scatter Plot", href="/page-3", id="page-3-link", active='exact'),
+                        dbc.NavLink("Proteomic / Cytokine Comparison", href="/page-4", id="page-4-link", active='exact'),
+                        dbc.NavLink("Metabolomic Violin Plots", href="/page-5", id="page-5-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Scatter Plot", href="/page-6", id="page-6-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Line Plot", href="/page-7", id="page-7-link", active='exact'),
+                        # dbc.NavLink("scRNA-seq Bar Plots", href="/page-8", id="page-8-link", active='exact'),
                         # dbc.NavLink("Page 4", href="/page-4", id="page-4-link"),
                     ],
                     vertical=True,
@@ -142,20 +146,24 @@ def display_page(pathname):
     #     return mecfs_dash_app_test_only.layout
     # else:
     #     return "404 Page Error! Please choose a link"
+    # if pathname in ["/", "/page-1"]:
+    #     return mecfs_dash_app_clinical_data_lineplots.layout
     if pathname in ["/", "/page-1"]:
-        return mecfs_dash_app_clinical_data_lineplots.layout
+        return mecfs_dash_app_clinical_data_sunburst.layout
     elif pathname == "/page-2":
         return mecfs_dash_app_clinical_data_filters.layout
     elif pathname == "/page-3":
-        return mecfs_dash_app_clinical_data_sunburst.layout
-    elif pathname == "/page-4":
         return mecfs_dash_app_cytokine_data_filters.layout
+    elif pathname == "/page-4":
+        return mecfs_dash_app_proteomic_cytokine_comparison.layout
     elif pathname == "/page-5":
-        return mecfs_dash_app_scrna_summary_3dscatterplot.layout
+        return mecfs_dash_app_metabolomic_violin_plots.layout
     elif pathname == "/page-6":
-        return mecfs_dash_app_scrna_summary_lineplots.layout
+        return mecfs_dash_app_scrna_summary_3dscatterplot.layout
     elif pathname == "/page-7":
-        return mecfs_dash_app_scrna_summary_barplots.layout
+        return mecfs_dash_app_scrna_summary_lineplots.layout
+    # elif pathname == "/page-8":
+    #     return mecfs_dash_app_scrna_summary_barplots.layout
     # elif pathname == "/page-4":
     #     return dbc.Jumbotron(html.H1("Oh cool, this is page 4!", className="text-success"))
     #     # return html.P("Oh cool, this is page 3!")

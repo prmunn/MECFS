@@ -85,6 +85,16 @@ class ClinicalData(mongoengine.Document):
     metabolomic = mongoengine.EmbeddedDocumentListField(Metabolomic)
     scrnaseq_summary = mongoengine.EmbeddedDocumentListField(ScRNAseqSummary)
 
+    @classmethod
+    def get_demographic_attributes(cls):
+        # Remove non-JSON serializable objects
+        excludeFields = ['objects', 'DoesNotExist', 'MultipleObjectsReturned', 'id',
+                         'biospecimen_data_references', 'redcap', 'proteomic', 'cytokine', 'metabolomic',
+                         'scrnaseq_summary', 'get_demographic_attributes', 'demographic_data_only',
+                         'redcap_data_only', 'proteomic_data_only', 'cytokine_data_only',
+                         'metabolomic_data_only', 'scrnaseq_summary_data_only']
+        return [i for i in cls.__dict__.keys() if not i.startswith('_') and i not in excludeFields]
+
     @mongoengine.queryset_manager
     def demographic_data_only(doc_cls, queryset):
         return queryset.exclude('biospecimen_data_references',
