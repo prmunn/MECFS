@@ -17,6 +17,7 @@ from apps import mecfs_dash_app_metabolomic_violin_plots
 from apps import mecfs_dash_app_scrna_summary_3dscatterplot
 from apps import mecfs_dash_app_scrna_summary_lineplots
 from apps import mecfs_dash_app_scrna_summary_barplots
+from apps import mecfs_dash_app_sql_interface
 
 # the style arguments for the sidebar. We use position:fixed and a fixed width
 SIDEBAR_STYLE = {
@@ -56,11 +57,12 @@ card_sidebar = html.Div(
                         # dbc.NavLink("Demographic Line Plot", href="/page-1", id="page-1-link", active='exact'),
                         dbc.NavLink("Demographic Sunburst", href="/page-1", id="page-1-link", active='exact'),
                         dbc.NavLink("Demographic Scatter Plot", href="/page-2", id="page-2-link", active='exact'),
-                        dbc.NavLink("Cytokine Scatter Plot", href="/page-3", id="page-3-link", active='exact'),
-                        dbc.NavLink("Proteomic / Cytokine Comparison", href="/page-4", id="page-4-link", active='exact'),
-                        dbc.NavLink("Metabolomic Violin Plots", href="/page-5", id="page-5-link", active='exact'),
-                        dbc.NavLink("scRNA-seq Scatter Plot", href="/page-6", id="page-6-link", active='exact'),
-                        dbc.NavLink("scRNA-seq Line Plot", href="/page-7", id="page-7-link", active='exact'),
+                        dbc.NavLink("SQL Interface", href="/page-3", id="page-3-link", active='exact'),
+                        dbc.NavLink("Cytokine Scatter Plot", href="/page-4", id="page-4-link", active='exact'),
+                        dbc.NavLink("Proteomic / Cytokine Comparison", href="/page-5", id="page-5-link", active='exact'),
+                        dbc.NavLink("Metabolomic Violin Plots", href="/page-6", id="page-6-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Scatter Plot", href="/page-7", id="page-7-link", active='exact'),
+                        dbc.NavLink("scRNA-seq Line Plot", href="/page-8", id="page-8-link", active='exact'),
                         # dbc.NavLink("scRNA-seq Bar Plots", href="/page-8", id="page-8-link", active='exact'),
                         # dbc.NavLink("Page 4", href="/page-4", id="page-4-link"),
                     ],
@@ -127,14 +129,14 @@ app.layout = dbc.Container([
 # this callback uses the current pathname to set the active state of the
 # corresponding nav link to true, allowing users to tell see page they are on
 @app.callback(
-    [Output(f"page-{i}-link", "active") for i in range(1, 8)],
+    [Output(f"page-{i}-link", "active") for i in range(1, 9)],
     [Input("url", "pathname")],
 )
 def toggle_active_links(pathname):
     if pathname == "/":
         # Treat page 1 as the homepage / index
-        return True, False, False, False, False, False, False
-    return [pathname == f"/page-{i}" for i in range(1, 8)]
+        return True, False, False, False, False, False, False, False
+    return [pathname == f"/page-{i}" for i in range(1, 9)]
 
 
 @app.callback(Output('page-content', 'children'),
@@ -153,14 +155,16 @@ def display_page(pathname):
     elif pathname == "/page-2":
         return mecfs_dash_app_clinical_data_filters.layout
     elif pathname == "/page-3":
-        return mecfs_dash_app_cytokine_data_filters.layout
+        return mecfs_dash_app_sql_interface.layout
     elif pathname == "/page-4":
-        return mecfs_dash_app_proteomic_cytokine_comparison.layout
+        return mecfs_dash_app_cytokine_data_filters.layout
     elif pathname == "/page-5":
-        return mecfs_dash_app_metabolomic_violin_plots.layout
+        return mecfs_dash_app_proteomic_cytokine_comparison.layout
     elif pathname == "/page-6":
-        return mecfs_dash_app_scrna_summary_3dscatterplot.layout
+        return mecfs_dash_app_metabolomic_violin_plots.layout
     elif pathname == "/page-7":
+        return mecfs_dash_app_scrna_summary_3dscatterplot.layout
+    elif pathname == "/page-8":
         return mecfs_dash_app_scrna_summary_lineplots.layout
     # elif pathname == "/page-8":
     #     return mecfs_dash_app_scrna_summary_barplots.layout

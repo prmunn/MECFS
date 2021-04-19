@@ -61,7 +61,8 @@ def create_df_from_object_list(object_list, clsList, subDocumentList, assayResul
                                 continue
                             # print('assayResult.data_label_reference.gene_symbol_references:', assayResult.data_label_reference.gene_symbol_references[0].data_label)
                             if assayResult['data_label'] not in dataLabelsList and \
-                                    assayResult.data_label_reference.gene_symbol_references[0] in dataLabelPathwayIDs.data_label_references:
+                                    assayResult.data_label_reference.gene_symbol_references[
+                                        0] in dataLabelPathwayIDs.data_label_references:
                                 dataLabelsList.append(assayResult['data_label'])
     # print('dataLabelsList:', dataLabelsList)
 
@@ -175,7 +176,7 @@ def data_table(table_id, df):
         selected_rows=[],  # indices of rows that user selects
         page_action="native",  # all data is passed to the table up-front or not ('none')
         page_current=0,  # page number that user is on
-        page_size=9,  # number of rows visible per page
+        # page_size=9,  # number of rows visible per page
         style_cell={  # ensure adequate header width when text is shorter than cell's text
             'minWidth': 95, 'maxWidth': 95, 'width': 95
         },
